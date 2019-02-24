@@ -1,14 +1,7 @@
 package dubstep;
-import net.sf.jsqlparser.parser.CCJSqlParser;
 import net.sf.jsqlparser.parser.ParseException;
-import net.sf.jsqlparser.schema.Table;
-import net.sf.jsqlparser.statement.Statement;
-import net.sf.jsqlparser.statement.select.FromItem;
-import net.sf.jsqlparser.statement.select.PlainSelect;
-import net.sf.jsqlparser.statement.select.Select;
 
 import java.io.*;
-import java.util.Scanner;
 
 public class Main {
 
@@ -23,6 +16,6 @@ public class Main {
 
 
 	public static void main(String[] Args) throws IOException, ParseException {
-		Parser.parseAndEvaluate(System.in);
+		Parser.parseAndEvaluate();
 	}
 }

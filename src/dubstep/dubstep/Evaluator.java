@@ -22,10 +22,12 @@ import java.util.stream.Stream;
 
 public class Evaluator {
     private static Map<String, LinkedHashMap<String, String>> tableSchema = new LinkedHashMap<>();
-    static Eval eval;
+    private static Map<String, String> aliasMap = new HashMap<>();
 
     public static void createTable(CreateTable createStatement) {
-        tableSchema.put(createStatement.getTable().getName(), createStatement.getColumnDefinitions()
+        tableSchema.put(createStatement.getTable().getAlias() != null
+                ? createStatement.getTable().getAlias(): createStatement.getTable().getName(),
+                createStatement.getColumnDefinitions()
                 .stream()
                 .collect(Collectors.toMap(ColumnDefinition::getColumnName,
                         c -> c.getColDataType().getDataType(),
@@ -34,8 +36,8 @@ public class Evaluator {
     }
 
 
-    public static boolean doSelect(List<PrimitiveValue> tuple, String schemaName, Expression expression) {
-        TupleEval tupleEval = getEval(schemaName, tuple);
+    public static boolean doSelect(List<Cell> tuple, Expression expression) {
+        TupleEval tupleEval = getEval(tuple);
 
         try {
             return (tupleEval.eval(expression).toBool());
@@ -45,17 +47,17 @@ public class Evaluator {
         }
     }
 
-    public static List<PrimitiveValue> doProject(List<PrimitiveValue> tuple, String schemaName, List<SelectItem> selectItems){
-        TupleEval tupleEval = getEval(schemaName, tuple);
-        if(selectItems.stream().anyMatch(selectItem -> (selectItem instanceof AllTableColumns))) {
+    public static List<Cell> doProject(List<Cell> tuple, List<SelectItem> selectItems){
+        TupleEval tupleEval = getEval(tuple);
+        if(selectItems.get(0) instanceof AllTableColumns) {
             return tuple;   //Global Wildcard, can return as we know it is the only SelectItem
         }
-        List<PrimitiveValue> projectedTuple = new ArrayList<>();
+        List<Cell> projectedTuple = new ArrayList<>();
         for(SelectItem selectItem : selectItems) {
             if(selectItem instanceof SelectExpressionItem) {
                 SelectExpressionItem selectExpressionItem = (SelectExpressionItem) selectItem;
                 try {
-                    projectedTuple.add(tupleEval.eval(selectExpressionItem.getExpression()));
+                    projectedTuple.add(new Cell(selectExpressionItem.getAlias(), tupleEval.eval(selectExpressionItem.getExpression())));
                 } catch (SQLException e) {
                     System.out.println("Error doing project");
                 }
@@ -64,43 +66,41 @@ public class Evaluator {
         return projectedTuple;
     }
 
-//    public static Stream<String> simpleJoin()
-
-    private static TupleEval getEval(String schemaName, List<PrimitiveValue> tuple) {
+    private static TupleEval getEval(List<Cell> tuple) {
         TupleEval tupleEval = new TupleEval();
-        AtomicInteger counter = new AtomicInteger(0);
-        tupleEval.tupleSchema = tableSchema.get(schemaName).entrySet()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e->counter.getAndIncrement()));
         tupleEval.currentTuple = tuple;
-
         return tupleEval;
     }
 
-    public static List<PrimitiveValue> parseTuple(String tupleString, String tablename) {
-        Map<String, String> tupleSchema = tableSchema.get(tablename);
+    private static String getTableName(String tableAlias) {
+        return aliasMap.getOrDefault(tableAlias, tableAlias);
+    }
+
+    private static List<Cell> parseTuple(String tupleString, String tableAlias) {
+        Map<String, String> tupleSchema = tableSchema.get(getTableName(tableAlias));
         List<String> typeList = new ArrayList<>(tupleSchema.values());
+        List<String> colList = new ArrayList<>(tupleSchema.keySet());
         int i = 0;
-        List<PrimitiveValue> tuple = new ArrayList<>();
+        List<Cell> tuple = new ArrayList<>();
         for(String cell : tupleString.split("\\|")) {
             switch (typeList.get(i)) {
                 case "string":
                 case "varchar":
                 case "char":
-                    tuple.add(new StringValue(cell));
+                    tuple.add(new Cell(tableAlias + "." + colList.get(i), new StringValue(cell)));
                     break;
                 case "int":
-                    tuple.add(new LongValue(cell));
+                    tuple.add(new Cell(tableAlias + "." + colList.get(i), new LongValue(cell)));
                     break;
                 case "decimal":
-                    tuple.add(new DoubleValue(cell));
+                    tuple.add(new Cell(tableAlias + "." + colList.get(i), new DoubleValue(cell)));
                     break;
                 case "date":
-                    tuple.add(new DateValue(cell));
+                    tuple.add(new Cell(tableAlias + "." + colList.get(i), new DateValue(cell)));
                     break;
                 default:
                     System.out.println("Could not parse cell " + cell);
-                    tuple.add(new StringValue(cell));
+                    tuple.add(new Cell(tableAlias + "." + colList.get(i), new StringValue(cell)));
                     break;
             }
             i++;
@@ -108,10 +108,13 @@ public class Evaluator {
         return tuple;
     }
 
-    public static Stream<List<PrimitiveValue>> tableScan(String tableName) {
+    public static Stream<List<Cell>> tableScan(String tableName, String tableAlias) {
         Path path = Paths.get("/Users/rvi/CSE/DB/team34/data/" + tableName + ".dat");
+        if(!tableAlias.equals(tableName) && !aliasMap.containsKey(tableAlias)) {    //Store table aliases
+            aliasMap.put(tableAlias, tableName);
+        }
         try {
-            return Files.lines(path).map(s -> parseTuple(s, tableName));
+            return Files.lines(path).map(s -> parseTuple(s, tableAlias));
         } catch (IOException e) {
             System.out.println("csv file error " + e.getMessage());
             return null;

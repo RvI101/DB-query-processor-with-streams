@@ -7,14 +7,17 @@ import net.sf.jsqlparser.schema.Column;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class TupleEval extends Eval {
-    public Map<String, Integer> tupleSchema;
-    public List<PrimitiveValue> currentTuple;
+    public List<Cell> currentTuple;
 
     @Override
     public PrimitiveValue eval(Column column) throws SQLException {
-        int colID = tupleSchema.get(column.getColumnName());
-        return currentTuple.get(colID);
+        return Objects.requireNonNull(currentTuple.stream()
+                .filter(cell -> column.getWholeColumnName().equals(cell.getAlias()))
+                .findFirst()
+                .orElse(null))
+                .getValue();
     }
 }
