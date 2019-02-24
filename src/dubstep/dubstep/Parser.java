@@ -29,11 +29,15 @@ public class Parser {
                     if(plainSelect.getFromItem() instanceof Table) {    //Simple Table Scan
                         Table table = (Table)plainSelect.getFromItem();
                         Stream<List<PrimitiveValue>> tuples = Evaluator.tableScan(table.getName());
-                        String tupleResult = Objects.requireNonNull(tuples).filter(t -> Evaluator.doSelect(t, table.getName(), plainSelect.getWhere()))
+                        Objects.requireNonNull(tuples).filter(t -> Evaluator.doSelect(t, table.getName(), plainSelect.getWhere()))
                                 .map(t -> Evaluator.doProject(t, table.getName(), plainSelect.getSelectItems()))
-                                .map(Object::toString)
-                                .collect(Collectors.joining("|"));
-                        System.out.println(tupleResult);
+                                .forEach(
+                                        t -> {
+                                            String tupleString = t.stream().map(PrimitiveValue::toRawString).collect(Collectors.joining("|"));
+                                            System.out.println(tupleString);
+                                        }
+                                );
+//                        System.out.println(tupleResult);
                     }
                 }
 
