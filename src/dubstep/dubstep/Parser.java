@@ -60,6 +60,13 @@ public class Parser {
             return Objects.requireNonNull(tuples).filter(t -> Evaluator.doSelect(t, plainSelect.getWhere()))
                     .map(t -> Evaluator.doProject(t, plainSelect.getSelectItems()));
         }
-        return null;
+        else {
+            Union union = (Union) selectBody;
+            Stream<List<Cell>> results = Stream.empty();
+            for(PlainSelect plainSelect : union.getPlainSelects()) {
+                results = Stream.concat(results, handleSelect(plainSelect));
+            }
+            return results;
+        }
     }
 }

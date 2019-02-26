@@ -3,15 +3,25 @@ package dubstep;
 import net.sf.jsqlparser.expression.PrimitiveValue;
 
 public class Cell {
+    String table;
     String alias;
     PrimitiveValue value;
 
     public Cell(String alias, PrimitiveValue value) {
         this.alias = alias;
         this.value = value;
+        this.table = alias.split("\\.")[0];
     }
 
     public Cell() {
+    }
+
+    public String getTable() {
+        return table;
+    }
+
+    public void setTable(String table) {
+        this.table = table;
     }
 
     public String getAlias() {

@@ -5,10 +5,7 @@ import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.create.table.ColumnDefinition;
 import net.sf.jsqlparser.statement.create.table.CreateTable;
-import net.sf.jsqlparser.statement.select.AllTableColumns;
-import net.sf.jsqlparser.statement.select.Select;
-import net.sf.jsqlparser.statement.select.SelectExpressionItem;
-import net.sf.jsqlparser.statement.select.SelectItem;
+import net.sf.jsqlparser.statement.select.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -49,11 +46,15 @@ public class Evaluator {
 
     public static List<Cell> doProject(List<Cell> tuple, List<SelectItem> selectItems){
         TupleEval tupleEval = getEval(tuple);
-        if(selectItems.get(0) instanceof AllTableColumns) {
+        if(selectItems.get(0) instanceof AllColumns) {
             return tuple;   //Global Wildcard, can return as we know it is the only SelectItem
         }
         List<Cell> projectedTuple = new ArrayList<>();
         for(SelectItem selectItem : selectItems) {
+            if(selectItem instanceof AllTableColumns) {
+                AllTableColumns allTableColumns = (AllTableColumns) selectItem;
+                projectedTuple.addAll(tuple.stream().filter(c -> c.getTable().equals(((AllTableColumns) selectItem).getTable().getName())).collect(Collectors.toList()));
+            }
             if(selectItem instanceof SelectExpressionItem) {
                 SelectExpressionItem selectExpressionItem = (SelectExpressionItem) selectItem;
                 try {
@@ -114,7 +115,7 @@ public class Evaluator {
             aliasMap.put(tableAlias, tableName);
         }
         try {
-            return Files.lines(path).map(s -> parseTuple(s, tableAlias));
+            return Files.lines(path).parallel().map(s -> parseTuple(s, tableAlias));
         } catch (IOException e) {
             System.out.println("csv file error " + e.getMessage());
             return null;
