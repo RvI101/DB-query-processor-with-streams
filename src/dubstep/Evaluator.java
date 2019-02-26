@@ -113,7 +113,7 @@ public class Evaluator {
     }
 
     public static Stream<List<Cell>> tableScan(String tableName, String tableAlias) {
-        Path path = Paths.get("/Users/rvi/CSE/DB/team34/data/" + tableName + ".dat");
+        Path path = Paths.get("data/" + tableName + ".csv");
         if(!tableAlias.equals(tableName) && !aliasMap.containsKey(tableAlias)) {    //Store table aliases
             aliasMap.put(tableAlias, tableName);
         }
