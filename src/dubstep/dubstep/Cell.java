@@ -10,7 +10,7 @@ public class Cell {
     public Cell(String alias, PrimitiveValue value) {
         this.alias = alias;
         this.value = value;
-        this.table = alias.split("\\.")[0];
+        this.table = alias.split("\\.")[0] != null ? alias.split("\\.")[0] : "";
     }
 
     public Cell() {

@@ -15,7 +15,10 @@ public class TupleEval extends Eval {
     @Override
     public PrimitiveValue eval(Column column) throws SQLException {
         return Objects.requireNonNull(currentTuple.stream()
-                .filter(cell -> column.getWholeColumnName().equals(cell.getAlias()))
+                .filter(cell -> {
+                    String cellColAlias = cell.getAlias().split("\\.")[1];
+                    return column.getWholeColumnName().equals(cell.getAlias()) || column.getWholeColumnName().equals(cellColAlias);
+                })
                 .findFirst()
                 .orElse(null))
                 .getValue();

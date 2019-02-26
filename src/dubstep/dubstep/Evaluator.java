@@ -58,7 +58,10 @@ public class Evaluator {
             if(selectItem instanceof SelectExpressionItem) {
                 SelectExpressionItem selectExpressionItem = (SelectExpressionItem) selectItem;
                 try {
-                    projectedTuple.add(new Cell(selectExpressionItem.getAlias(), tupleEval.eval(selectExpressionItem.getExpression())));
+                    String colName = selectExpressionItem.getAlias() != null
+                            ? selectExpressionItem.getAlias()
+                            : ((Column) selectExpressionItem.getExpression()).getColumnName();
+                    projectedTuple.add(new Cell(colName, tupleEval.eval(selectExpressionItem.getExpression())));
                 } catch (SQLException e) {
                     System.out.println("Error doing project");
                 }
