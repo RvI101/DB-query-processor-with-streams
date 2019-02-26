@@ -1,0 +1,10 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="team34:jar">
+    <output-path>$PROJECT_DIR$/src/dubstep/output/artifacts/team34_jar</output-path>
+    <root id="archive" name="team34.jar">
+      <element id="module-output" name="team34" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/jsqlparser-1.0.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/evallib-1.0.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
