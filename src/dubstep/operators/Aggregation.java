@@ -4,17 +4,26 @@ import net.sf.jsqlparser.expression.Expression;
 
 import java.util.List;
 
-public class Aggregation {
+public class Aggregation extends Operator{
     private AggregationType type;
     private Expression onExpression;
     private List<Expression> groupBy;
     private Expression having;
+    Operator child;
 
     public Aggregation(AggregationType type, Expression onExpression, List<Expression> groupBy, Expression having) {
         this.type = type;
         this.onExpression = onExpression;
         this.groupBy = groupBy;
         this.having = having;
+    }
+
+    public Aggregation(AggregationType type, Expression onExpression, List<Expression> groupBy, Expression having, Operator child) {
+        this.type = type;
+        this.onExpression = onExpression;
+        this.groupBy = groupBy;
+        this.having = having;
+        this.child = child;
     }
 
     public AggregationType getType() {
@@ -47,5 +56,13 @@ public class Aggregation {
 
     public void setHaving(Expression having) {
         this.having = having;
+    }
+
+    public Operator getChild() {
+        return child;
+    }
+
+    public void setChild(Operator child) {
+        this.child = child;
     }
 }
