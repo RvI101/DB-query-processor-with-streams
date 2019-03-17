@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Projection extends Operator {
     List<SelectItem> items;
@@ -40,6 +41,10 @@ public class Projection extends Operator {
 
     public void setChild(Operator child) {
         this.child = child;
+    }
+
+    public Stream<List<Cell>> evaluate(Stream<List<Cell>> tuples) {
+        return tuples.map(t -> doProject(t, getItems()));
     }
 
     public static List<Cell> doProject(List<Cell> tuple, List<SelectItem> selectItems){

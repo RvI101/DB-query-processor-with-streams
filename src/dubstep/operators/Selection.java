@@ -1,11 +1,14 @@
 package dubstep.operators;
 
 import dubstep.Cell;
+import dubstep.Evaluator;
 import dubstep.TupleEval;
 import net.sf.jsqlparser.expression.Expression;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 public class Selection extends Operator{
     Expression condition;
@@ -34,6 +37,10 @@ public class Selection extends Operator{
 
     public void setChild(Operator child) {
         this.child = child;
+    }
+
+    public Stream<List<Cell>> evaluate(Stream<List<Cell>> tuples) {
+        return Objects.requireNonNull(tuples).filter(t -> doSelect(t, getCondition()));
     }
 
     public static boolean doSelect(List<Cell> tuple, Expression expression) {

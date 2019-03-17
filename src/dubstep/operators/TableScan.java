@@ -15,14 +15,29 @@ import java.util.stream.Stream;
 
 public class TableScan extends Operator {
     String tableName;
+    String tableAlias;
+
     private static Map<String, LinkedHashMap<String, String>> tableSchema = new LinkedHashMap<>();
     private static Map<String, String> aliasMap = new HashMap<>();
 
     public TableScan() {
     }
 
+    public TableScan(String tableName, String tableAlias) {
+        this.tableName = tableName;
+        this.tableAlias = tableAlias;
+    }
+
     public TableScan(String tableName) {
         this.tableName = tableName;
+    }
+
+    public String getTableAlias() {
+        return tableAlias;
+    }
+
+    public void setTableAlias(String tableAlias) {
+        this.tableAlias = tableAlias;
     }
 
     public String getTableName() {
@@ -33,7 +48,7 @@ public class TableScan extends Operator {
         this.tableName = tableName;
     }
 
-    public static Stream<List<Cell>> tableScan(String tableName, String tableAlias) {
+    public Stream<List<Cell>> tableScan() {
         Path path = Paths.get("data/" + tableName + ".csv");
         if(!tableAlias.equals(tableName) && !aliasMap.containsKey(tableAlias)) {    //Store table aliases
             aliasMap.put(tableAlias, tableName);
