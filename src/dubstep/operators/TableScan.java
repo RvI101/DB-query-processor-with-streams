@@ -5,12 +5,16 @@ import net.sf.jsqlparser.expression.DateValue;
 import net.sf.jsqlparser.expression.DoubleValue;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.StringValue;
+import net.sf.jsqlparser.schema.Table;
+import net.sf.jsqlparser.statement.create.table.ColumnDefinition;
+import net.sf.jsqlparser.statement.create.table.CreateTable;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class TableScan extends Operator {
@@ -26,6 +30,11 @@ public class TableScan extends Operator {
     public TableScan(String tableName, String tableAlias) {
         this.tableName = tableName;
         this.tableAlias = tableAlias;
+    }
+
+    public TableScan(Table table) {
+        this.tableAlias = table.getAlias() != null ? table.getAlias() : table.getName();
+        this.tableName = table.getName();
     }
 
     public TableScan(String tableName) {
@@ -48,13 +57,24 @@ public class TableScan extends Operator {
         this.tableName = tableName;
     }
 
+    public static void createTable(CreateTable createStatement) {
+        tableSchema.put(createStatement.getTable().getAlias() != null
+                        ? createStatement.getTable().getAlias(): createStatement.getTable().getName(),
+                createStatement.getColumnDefinitions()
+                        .stream()
+                        .collect(Collectors.toMap(ColumnDefinition::getColumnName,
+                                c -> c.getColDataType().getDataType(),
+                                (v1,v2) -> {throw new IllegalStateException("Duplicate column in schema");},
+                                LinkedHashMap::new)));
+    }
+
     public Stream<List<Cell>> tableScan() {
-        Path path = Paths.get("data/" + tableName + ".csv");
+        Path path = Paths.get("data/data/" + tableName + ".dat").toAbsolutePath();
         if(!tableAlias.equals(tableName) && !aliasMap.containsKey(tableAlias)) {    //Store table aliases
             aliasMap.put(tableAlias, tableName);
         }
         try {
-            return Files.lines(path).parallel().map(s -> parseTuple(s, tableAlias));
+            return Files.lines(path).map(s -> parseTuple(s, tableAlias));
         } catch (IOException e) {
             System.out.println("csv file error " + e.getMessage());
             return null;

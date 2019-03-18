@@ -31,45 +31,45 @@ public class Parser {
                 );
             }
             else if(statement instanceof CreateTable) {
-                Evaluator.createTable((CreateTable)statement);
+                TableScan.createTable((CreateTable)statement);
             }
             System.out.print("$>");
         }
 
     }
-    private static Stream<List<Cell>> handleSelect(SelectBody selectBody) {
-        if(selectBody instanceof PlainSelect) {
-            PlainSelect plainSelect = (PlainSelect)selectBody;
-            Stream<List<Cell>> tuples = null;
-            if(plainSelect.getFromItem() instanceof Table) {
-                Table table = (Table) plainSelect.getFromItem();
-                String tableAlias = table.getAlias() != null ? table.getAlias() : table.getName();
-                tuples = Evaluator.tableScan(table.getName(), tableAlias);
-                if(plainSelect.getJoins() != null && !plainSelect.getJoins().isEmpty()) {
-                    for(Join join : plainSelect.getJoins()) {
-                        String joinAlias = join.getRightItem().getAlias() != null
-                                ? join.getRightItem().getAlias() : ((Table)join.getRightItem()).getName();
-                        tuples = Objects.requireNonNull(tuples)
-                                .flatMap(tuple -> Evaluator.tableScan(((Table)join.getRightItem()).getName(), joinAlias)
-                                        .map(t -> {t.addAll(tuple); return t;}));
-                    }
-                }
-            }
-            else if(plainSelect.getFromItem() instanceof SubSelect){
-                tuples = handleSelect(((SubSelect)plainSelect.getFromItem()).getSelectBody());
-            }
-            return Objects.requireNonNull(tuples).filter(t -> Evaluator.doSelect(t, plainSelect.getWhere()))
-                    .map(t -> Evaluator.doProject(t, plainSelect.getSelectItems()));
-        }
-        else {
-            Union union = (Union) selectBody;
-            Stream<List<Cell>> results = Stream.empty();
-            for(PlainSelect plainSelect : union.getPlainSelects()) {
-                results = Stream.concat(results, handleSelect(plainSelect));
-            }
-            return results;
-        }
-    }
+//    private static Stream<List<Cell>> handleSelect(SelectBody selectBody) {
+//        if(selectBody instanceof PlainSelect) {
+//            PlainSelect plainSelect = (PlainSelect)selectBody;
+//            Stream<List<Cell>> tuples = null;
+//            if(plainSelect.getFromItem() instanceof Table) {
+//                Table table = (Table) plainSelect.getFromItem();
+//                String tableAlias = table.getAlias() != null ? table.getAlias() : table.getName();
+//                tuples = Evaluator.tableScan(table.getName(), tableAlias);
+//                if(plainSelect.getJoins() != null && !plainSelect.getJoins().isEmpty()) {
+//                    for(Join join : plainSelect.getJoins()) {
+//                        String joinAlias = join.getRightItem().getAlias() != null
+//                                ? join.getRightItem().getAlias() : ((Table)join.getRightItem()).getName();
+//                        tuples = Objects.requireNonNull(tuples)
+//                                .flatMap(tuple -> Evaluator.tableScan(((Table)join.getRightItem()).getName(), joinAlias)
+//                                        .map(t -> {t.addAll(tuple); return t;}));
+//                    }
+//                }
+//            }
+//            else if(plainSelect.getFromItem() instanceof SubSelect){
+//                tuples = handleSelect(((SubSelect)plainSelect.getFromItem()).getSelectBody());
+//            }
+//            return Objects.requireNonNull(tuples).filter(t -> Evaluator.doSelect(t, plainSelect.getWhere()))
+//                    .map(t -> Evaluator.doProject(t, plainSelect.getSelectItems()));
+//        }
+//        else {
+//            Union union = (Union) selectBody;
+//            Stream<List<Cell>> results = Stream.empty();
+//            for(PlainSelect plainSelect : union.getPlainSelects()) {
+//                results = Stream.concat(results, handleSelect(plainSelect));
+//            }
+//            return results;
+//        }
+//    }
 
     private static Operator parseStatement(SelectBody selectBody) {
         if(selectBody instanceof PlainSelect) {
@@ -83,8 +83,7 @@ public class Parser {
             if(plainSelect.getFromItem() instanceof Table) {
                 // Table Scan
                 Table table = (Table) plainSelect.getFromItem();
-                String tableAlias = table.getAlias() != null ? table.getAlias() : table.getName();
-                TableScan tableScan = new TableScan(table.getName(), tableAlias);
+                TableScan tableScan = new TableScan(table);
                 if(plainSelect.getJoins() == null || plainSelect.getJoins().isEmpty()) {
                     //Simple select statement with only one table
                     node = node.cascade(tableScan);
@@ -93,12 +92,24 @@ public class Parser {
                 if(plainSelect.getJoins() != null && !plainSelect.getJoins().isEmpty()) {
                    //Cross Product
                     CrossProduct crossProduct = new CrossProduct();
-                    Join join = plainSelect.getJoins().get(0);
-                    String joinAlias = join.getRightItem().getAlias() != null
-                            ? join.getRightItem().getAlias() : ((Table) join.getRightItem()).getName();
-                    crossProduct.setLeft(tableScan);
-                    crossProduct.setRight(new TableScan(((Table) join.getRightItem()).getName(), joinAlias));
-                    node.cascade(crossProduct);
+                    node = node.cascade(crossProduct);
+                    int num = plainSelect.getJoins().size();
+                    int i = 1;
+                    if(num == 1) {
+                        ((CrossProduct)node).setLeft(tableScan);
+                        ((CrossProduct)node).setRight(new TableScan((Table) plainSelect.getJoins().get(0).getRightItem()));
+                    }
+                    else {
+                        for (Join join : plainSelect.getJoins()) {
+                            ((CrossProduct) node).setLeft(new TableScan((Table) join.getRightItem()));
+                            ((CrossProduct) node).setRight(new CrossProduct());
+                            node = ((CrossProduct) node).getRight();
+                            if (++i > num - 2)
+                                break;
+                        }
+                        ((CrossProduct) node).setLeft(new TableScan((Table) plainSelect.getJoins().get(i - 1).getRightItem()));
+                        ((CrossProduct) node).setRight(new TableScan((Table) plainSelect.getJoins().get(i).getRightItem()));
+                    }
                     return root;
                 }
 
@@ -123,8 +134,11 @@ public class Parser {
                 if(++i > num - 2)
                     break;
             }
+            ((dubstep.operators.Union) node).setLeft(parseStatement(union.getPlainSelects().get(i - 1)));
+            ((dubstep.operators.Union) node).setRight(parseStatement(union.getPlainSelects().get(i)));
+
+            return root;
         }
-        return null;
     }
 
     private static Stream<List<Cell>> evaluateTree(Operator node) {
