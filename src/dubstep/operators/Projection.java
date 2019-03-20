@@ -63,7 +63,7 @@ public class Projection extends Operator {
                 try {
                     String colName = selectExpressionItem.getAlias() != null
                             ? selectExpressionItem.getAlias()
-                            : ((Column) selectExpressionItem.getExpression()).getColumnName();
+                            : ((Column) selectExpressionItem.getExpression()).getWholeColumnName();
                     projectedTuple.add(new Cell(colName, tupleEval.eval(selectExpressionItem.getExpression())));
                 } catch (SQLException e) {
                     System.out.println("Error doing project");

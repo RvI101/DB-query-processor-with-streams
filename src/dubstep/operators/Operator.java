@@ -20,7 +20,6 @@ public abstract class Operator {
             ((Selection) this).setChild(o);
             return o;
         }
-
         else if(this instanceof Projection) {
             ((Projection) this).setChild(o);
             return o;
@@ -29,7 +28,14 @@ public abstract class Operator {
             ((Aggregation) this).setChild(o);
             return o;
         }
-
+        else if(this instanceof Sort) {
+            ((Sort) this).setChild(o);
+            return o;
+        }
+        else if(this instanceof Limit) {
+            ((Limit) this).setChild(o);
+            return o;
+        }
         return null;
     }
 }

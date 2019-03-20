@@ -1,6 +1,7 @@
 package dubstep;
 
 import dubstep.operators.*;
+import dubstep.operators.Limit;
 import net.sf.jsqlparser.parser.CCJSqlParser;
 import net.sf.jsqlparser.parser.ParseException;
 import net.sf.jsqlparser.schema.Table;
@@ -74,8 +75,32 @@ public class Parser {
     private static Operator parseStatement(SelectBody selectBody) {
         if(selectBody instanceof PlainSelect) {
             PlainSelect plainSelect = (PlainSelect) selectBody;
-            Projection root = new Projection(plainSelect.getSelectItems());
-            Operator node = root;
+            Operator root = null;
+            Operator node = null;
+            // Limit operator
+            if(plainSelect.getLimit() != null) {
+                root = new Limit(plainSelect.getLimit().getRowCount());
+                node = root;
+            }
+            // Sort operator
+            if(plainSelect.getOrderByElements() != null && !plainSelect.getOrderByElements().isEmpty()) {
+                if(root == null) {
+                    root = new Sort(plainSelect.getOrderByElements());
+                    node = root;
+                }
+                else {
+                    node = node.cascade(new Sort(plainSelect.getOrderByElements()));
+                }
+            }
+            // Project operator
+            if(root == null) {
+                root = new Projection(plainSelect.getSelectItems());
+                node = root;
+            }
+            else {
+                node = node.cascade(new Projection(plainSelect.getSelectItems()));
+            }
+            // Select operator
             if (plainSelect.getWhere() != null) {
                 Selection selection = new Selection(plainSelect.getWhere());
                 node = node.cascade(selection);
@@ -142,12 +167,14 @@ public class Parser {
     }
 
     private static Stream<List<Cell>> evaluateTree(Operator node) {
-        if(node instanceof Selection) {
+        if(node instanceof Selection)
             return ((Selection) node).evaluate(evaluateTree(((Selection) node).getChild()));
-        }
-        else if(node instanceof Projection) {
+        else if(node instanceof Projection)
             return ((Projection) node).evaluate(evaluateTree(((Projection) node).getChild()));
-        }
+        else if(node instanceof Sort)
+            return ((Sort) node).evaluate(evaluateTree(((Sort) node).getChild()));
+        else if(node instanceof Limit)
+            return ((Limit) node).evaluate(evaluateTree(((Limit) node).getChild()));
         else if(node instanceof Aggregation) {
 
         }
