@@ -2,6 +2,7 @@ package dubstep;
 
 import dubstep.operators.*;
 import dubstep.operators.Limit;
+import net.sf.jsqlparser.expression.Function;
 import net.sf.jsqlparser.parser.CCJSqlParser;
 import net.sf.jsqlparser.parser.ParseException;
 import net.sf.jsqlparser.schema.Table;
@@ -92,9 +93,17 @@ public class Parser {
                     node = node.cascade(new Sort(plainSelect.getOrderByElements()));
                 }
             }
-            // Project operator
+            // Project or Aggregate operator
             if(root == null) {
-                root = new Projection(plainSelect.getSelectItems());
+                if((plainSelect.getGroupByColumnReferences() == null || plainSelect.getGroupByColumnReferences().isEmpty())
+                        && hasAgg(plainSelect.getSelectItems())) {
+                    root = new Aggregation(plainSelect.getSelectItems()
+                            .stream()
+                            .map(i -> ((SelectExpressionItem)i).getExpression())
+                            .collect(Collectors.toList()), null, null);
+                }
+                else
+                    root = new Projection(plainSelect.getSelectItems());
                 node = root;
             }
             else {
@@ -176,7 +185,7 @@ public class Parser {
         else if(node instanceof Limit)
             return ((Limit) node).evaluate(evaluateTree(((Limit) node).getChild()));
         else if(node instanceof Aggregation) {
-
+            return ((Aggregation) node).evaluate(evaluateTree(((Aggregation) node).getChild()));
         }
         else if(node instanceof CrossProduct) {
             return ((CrossProduct) node)
@@ -194,4 +203,12 @@ public class Parser {
         }
         return null;
     }
+
+    private static boolean hasAgg(List<SelectItem> selectItems) {
+        return selectItems.stream().anyMatch(item ->
+            {
+                return item instanceof SelectExpressionItem && ((SelectExpressionItem) item).getExpression() instanceof Function;
+            });
+    }
+
 }
