@@ -25,6 +25,7 @@ public class Parser {
         System.out.print("$>");
         Statement statement;
         while ((statement = parser.Statement()) != null) {
+            System.out.println("");
             if(statement instanceof Select) {
                 Objects.requireNonNull(evaluateTree(parseStatement(((Select) statement).getSelectBody())))
                         .forEach(
@@ -41,39 +42,6 @@ public class Parser {
         }
 
     }
-//    private static Stream<List<Cell>> handleSelect(SelectBody selectBody) {
-//        if(selectBody instanceof PlainSelect) {
-//            PlainSelect plainSelect = (PlainSelect)selectBody;
-//            Stream<List<Cell>> tuples = null;
-//            if(plainSelect.getFromItem() instanceof Table) {
-//                Table table = (Table) plainSelect.getFromItem();
-//                String tableAlias = table.getAlias() != null ? table.getAlias() : table.getName();
-//                tuples = Evaluator.tableScan(table.getName(), tableAlias);
-//                if(plainSelect.getJoins() != null && !plainSelect.getJoins().isEmpty()) {
-//                    for(Join join : plainSelect.getJoins()) {
-//                        String joinAlias = join.getRightItem().getAlias() != null
-//                                ? join.getRightItem().getAlias() : ((Table)join.getRightItem()).getName();
-//                        tuples = Objects.requireNonNull(tuples)
-//                                .flatMap(tuple -> Evaluator.tableScan(((Table)join.getRightItem()).getName(), joinAlias)
-//                                        .map(t -> {t.addAll(tuple); return t;}));
-//                    }
-//                }
-//            }
-//            else if(plainSelect.getFromItem() instanceof SubSelect){
-//                tuples = handleSelect(((SubSelect)plainSelect.getFromItem()).getSelectBody());
-//            }
-//            return Objects.requireNonNull(tuples).filter(t -> Evaluator.doSelect(t, plainSelect.getWhere()))
-//                    .map(t -> Evaluator.doProject(t, plainSelect.getSelectItems()));
-//        }
-//        else {
-//            Union union = (Union) selectBody;
-//            Stream<List<Cell>> results = Stream.empty();
-//            for(PlainSelect plainSelect : union.getPlainSelects()) {
-//                results = Stream.concat(results, handleSelect(plainSelect));
-//            }
-//            return results;
-//        }
-//    }
 
     private static Operator parseStatement(SelectBody selectBody) {
         if(selectBody instanceof PlainSelect) {
@@ -97,19 +65,25 @@ public class Parser {
             }
             // Project or Aggregate operator
             if(root == null) {
-                if((plainSelect.getGroupByColumnReferences() == null || plainSelect.getGroupByColumnReferences().isEmpty())
-                        && hasAgg(plainSelect.getSelectItems())) {
+                if(hasAgg(plainSelect.getSelectItems())) {
                     root = new Aggregation(plainSelect.getSelectItems()
                             .stream()
                             .map(i -> ((SelectExpressionItem)i).getExpression())
-                            .collect(Collectors.toList()), null, null);
+                            .collect(Collectors.toList()), plainSelect.getGroupByColumnReferences(), plainSelect.getHaving());
                 }
                 else
                     root = new Projection(plainSelect.getSelectItems());
                 node = root;
             }
             else {
-                node = node.cascade(new Projection(plainSelect.getSelectItems()));
+                if(hasAgg(plainSelect.getSelectItems())) {
+                    node = node.cascade(new Aggregation(plainSelect.getSelectItems()
+                            .stream()
+                            .map(i -> ((SelectExpressionItem)i).getExpression())
+                            .collect(Collectors.toList()), plainSelect.getGroupByColumnReferences(), plainSelect.getHaving()));
+                }
+                else
+                    node = node.cascade(new Projection(plainSelect.getSelectItems()));
             }
             // Select operator
             if (plainSelect.getWhere() != null) {
@@ -163,18 +137,17 @@ public class Parser {
             dubstep.operators.Union root = new dubstep.operators.Union();
             Operator node = root;
             int num = union.getPlainSelects().size();
-            int i = 1;
+            int i = 0;
             //Union
             for(PlainSelect plainSelect : union.getPlainSelects()) {
                 ((dubstep.operators.Union) node).setLeft(parseStatement(plainSelect));
                 ((dubstep.operators.Union) node).setRight(new dubstep.operators.Union());
                 node = ((dubstep.operators.Union) node).getRight();
-                if(++i > num - 2)
+                if(num - (++i) <= 2)
                     break;
             }
-            ((dubstep.operators.Union) node).setLeft(parseStatement(union.getPlainSelects().get(i - 1)));
-            ((dubstep.operators.Union) node).setRight(parseStatement(union.getPlainSelects().get(i)));
-
+            ((dubstep.operators.Union) node).setLeft(parseStatement(union.getPlainSelects().get(i)));
+            ((dubstep.operators.Union) node).setRight(parseStatement(union.getPlainSelects().get(i + 1)));
             return root;
         }
     }

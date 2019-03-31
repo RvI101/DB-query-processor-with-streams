@@ -14,13 +14,18 @@ public class TupleEval extends Eval {
 
     @Override
     public PrimitiveValue eval(Column column) throws SQLException {
-        return Objects.requireNonNull(currentTuple.stream()
-                .filter(cell -> {
-                    String cellColAlias = cell.getAlias().split("\\.")[1];
-                    return column.getWholeColumnName().equals(cell.getAlias()) || column.getWholeColumnName().equals(cellColAlias);
-                })
-                .findFirst()
-                .orElse(null))
-                .getValue();
+        try {
+            return Objects.requireNonNull(currentTuple.stream()
+                    .filter(cell -> {
+                        String cellColAlias = cell.getAlias().split("\\.")[1];
+                        return column.getWholeColumnName().equals(cell.getAlias()) || column.getWholeColumnName().equals(cellColAlias);
+                    })
+                    .findFirst()
+                    .orElse(null))
+                    .getValue();
+        }
+        catch (NullPointerException e) {
+            throw new SQLException("404");
+        }
     }
 }
