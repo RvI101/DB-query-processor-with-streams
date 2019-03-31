@@ -12,6 +12,8 @@ import net.sf.jsqlparser.statement.select.*;
 import net.sf.jsqlparser.statement.select.Join;
 import net.sf.jsqlparser.statement.select.Union;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -128,21 +130,23 @@ public class Parser {
                     CrossProduct crossProduct = new CrossProduct();
                     node = node.cascade(crossProduct);
                     int num = plainSelect.getJoins().size();
-                    int i = 1;
+                    int i = 0;
                     if(num == 1) {
                         ((CrossProduct)node).setLeft(tableScan);
                         ((CrossProduct)node).setRight(new TableScan((Table) plainSelect.getJoins().get(0).getRightItem()));
                     }
                     else {
-                        for (Join join : plainSelect.getJoins()) {
-                            ((CrossProduct) node).setLeft(new TableScan((Table) join.getRightItem()));
-                            ((CrossProduct) node).setRight(new CrossProduct());
-                            node = ((CrossProduct) node).getRight();
-                            if (++i > num - 2)
+                        List<Join> joinList = new ArrayList<>(plainSelect.getJoins());
+                        Collections.reverse(joinList); // reversing join list to create left deep nested cross product
+                        for (Join join : joinList) {
+                            ((CrossProduct) node).setRight(new TableScan((Table) join.getRightItem()));
+                            ((CrossProduct) node).setLeft(new CrossProduct());
+                            node = ((CrossProduct) node).getLeft();
+                            if (num - (++i) <= 1)
                                 break;
                         }
-                        ((CrossProduct) node).setLeft(new TableScan((Table) plainSelect.getJoins().get(i - 1).getRightItem()));
-                        ((CrossProduct) node).setRight(new TableScan((Table) plainSelect.getJoins().get(i).getRightItem()));
+                        ((CrossProduct) node).setLeft(tableScan);
+                        ((CrossProduct) node).setRight(new TableScan((Table) joinList.get(num - 1).getRightItem()));
                     }
                     return root;
                 }
