@@ -69,7 +69,7 @@ public class TableScan extends Operator {
     }
 
     public Stream<List<Cell>> tableScan() {
-        Path path = Paths.get("data/data/" + tableName + ".dat").toAbsolutePath();
+        Path path = Paths.get("data/data/" + tableName + ".csv").toAbsolutePath();
         if(!tableAlias.equals(tableName) && !aliasMap.containsKey(tableAlias)) {    //Store table aliases
             aliasMap.put(tableAlias, tableName);
         }
