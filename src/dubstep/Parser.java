@@ -3,6 +3,7 @@ package dubstep;
 import dubstep.operators.*;
 import dubstep.operators.Limit;
 import net.sf.jsqlparser.expression.*;
+import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.parser.CCJSqlParser;
 import net.sf.jsqlparser.parser.ParseException;
 import net.sf.jsqlparser.schema.Table;
@@ -39,7 +40,6 @@ public class Parser {
             }
             System.out.print("$>");
         }
-
     }
 
     private static Operator parseStatement(SelectBody selectBody, String alias) {
@@ -211,11 +211,38 @@ public class Parser {
         return null;
     }
 
+//    private Operator optimize(Operator node) {
+//        if(node instanceof Selection) {
+//            List<Expression> expressions = splitAndClauses(((Selection) node).getCondition());
+//            if(((Selection) node).getChild() instanceof CrossProduct) {
+//                CrossProduct crossProduct = (CrossProduct) ((Selection) node).getChild();
+//                Operator
+//            }
+//        }
+//    }
+
     private static boolean hasAgg(List<SelectItem> selectItems) {
         return selectItems.stream().anyMatch(item ->
             {
                 return item instanceof SelectExpressionItem && ((SelectExpressionItem) item).getExpression() instanceof Function;
             });
+    }
+
+    private List<Expression> splitAndClauses(Expression e)
+    {
+        List<Expression> ret = new ArrayList<>();
+        if(e instanceof AndExpression){
+            AndExpression a = (AndExpression)e;
+            ret.addAll(
+                    splitAndClauses(a.getLeftExpression())
+            );
+            ret.addAll(
+                    splitAndClauses(a.getRightExpression())
+            );
+        } else {
+            ret.add(e);
+        }
+        return ret;
     }
 
     public static String typeOf(PrimitiveValue value) {

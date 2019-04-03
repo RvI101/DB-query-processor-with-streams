@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.sql.SQLException;
 import java.util.*;
@@ -20,11 +21,18 @@ public class Sort extends Operator {
     List<OrderByElement> columns;
     private final static int BLOCK_SIZE = 500;
     List<Path> tmpPaths = new ArrayList<>();
-    private final File tmpDirectory = new File("data/tmp");
+    private File tmpDirectory;
+
     public Sort() {
+        try {
+            tmpDirectory = Files.createDirectories(Paths.get("data/tmp")).toFile();
+        } catch (IOException e) {
+            System.out.println("Error creating tmp directory");
+        }
     }
 
     public Sort(List<OrderByElement> columns) {
+        this();
         this.columns = columns;
     }
 
