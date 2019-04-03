@@ -56,15 +56,13 @@ public class Projection extends Operator {
         for(SelectItem selectItem : selectItems) {
             if(selectItem instanceof AllTableColumns) {
                 AllTableColumns allTableColumns = (AllTableColumns) selectItem;
-                projectedTuple.addAll(tuple.stream().filter(c -> c.getTable().equals(((AllTableColumns) selectItem).getTable().getName())).collect(Collectors.toList()));
+                projectedTuple.addAll(tuple.stream().filter(c -> c.getTable().equals(allTableColumns.getTable().getName())).collect(Collectors.toList()));
             }
             if(selectItem instanceof SelectExpressionItem) {
                 SelectExpressionItem selectExpressionItem = (SelectExpressionItem) selectItem;
                 try {
-                    String colName = selectExpressionItem.getAlias() != null
-                            ? selectExpressionItem.getAlias()
-                            : ((Column) selectExpressionItem.getExpression()).getWholeColumnName();
-                    projectedTuple.add(new Cell(colName, tupleEval.eval(selectExpressionItem.getExpression())));
+                    String colName = ((Column) selectExpressionItem.getExpression()).getWholeColumnName();
+                    projectedTuple.add(new Cell(colName, tupleEval.eval(selectExpressionItem.getExpression()), selectExpressionItem.getAlias()));
                 } catch (SQLException e) {
                     System.out.println("Error doing project");
                 }

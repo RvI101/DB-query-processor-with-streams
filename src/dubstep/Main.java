@@ -16,6 +16,6 @@ public class Main {
 
 
 	public static void main(String[] Args) throws IOException, ParseException {
-		Parser.parseAndEvaluate();
+		Parser.parseAndEvaluate(Args[0]);
 	}
 }

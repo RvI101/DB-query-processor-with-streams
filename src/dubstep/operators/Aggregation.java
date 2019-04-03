@@ -11,7 +11,7 @@ import java.util.stream.Stream;
 
 public class Aggregation extends Operator {
     private List<Expression> onExpression;
-    private String alias;
+    private String alias; //TODO Clean
     private List<Column> groupBy;
     private Expression having;
     Operator child;
@@ -130,7 +130,7 @@ public class Aggregation extends Operator {
            if(tupleGroupComparator.compare(refTuple, tuple) != 0) {
                List<Cell> gTuple = evaluateGroup(group);
                try {
-                   if(having != null && getEval(gTuple).eval(having).toBool())
+                   if(having != null && getEval(gTuple).eval(having).toBool()) //TODO: Evaluate Functions in having not already present as a Column
                        groupedTuples.add(evaluateGroup(group));
                    else if(having == null) {
                        groupedTuples.add(evaluateGroup(group));

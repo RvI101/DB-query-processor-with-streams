@@ -2,7 +2,7 @@ package dubstep;
 
 import dubstep.operators.*;
 import dubstep.operators.Limit;
-import net.sf.jsqlparser.expression.Function;
+import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.parser.CCJSqlParser;
 import net.sf.jsqlparser.parser.ParseException;
 import net.sf.jsqlparser.schema.Table;
@@ -12,22 +12,21 @@ import net.sf.jsqlparser.statement.select.*;
 import net.sf.jsqlparser.statement.select.Join;
 import net.sf.jsqlparser.statement.select.Union;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Parser {
-    static void parseAndEvaluate() throws ParseException {
+    public static int mode;
+    static void parseAndEvaluate(String modeString) throws ParseException {
+        mode = modeString.contains("mem") ? 1 : 2;
         CCJSqlParser parser = new CCJSqlParser(System.in);
         System.out.print("$>");
         Statement statement;
         while ((statement = parser.Statement()) != null) {
             System.out.println("");
             if(statement instanceof Select) {
-                Objects.requireNonNull(evaluateTree(parseStatement(((Select) statement).getSelectBody())))
+                Objects.requireNonNull(evaluateTree(parseStatement(((Select) statement).getSelectBody(), null)))
                         .forEach(
                         t -> {
                             String tupleString = t.stream().map(Cell::toString).collect(Collectors.joining("|"));
@@ -43,15 +42,24 @@ public class Parser {
 
     }
 
-    private static Operator parseStatement(SelectBody selectBody) {
+    private static Operator parseStatement(SelectBody selectBody, String alias) {
         if(selectBody instanceof PlainSelect) {
             PlainSelect plainSelect = (PlainSelect) selectBody;
             Operator root = null;
             Operator node = null;
+            //Alias operator
+            if(alias != null) {
+                root = new Alias(alias);
+                node = root;
+            }
             // Limit operator
             if(plainSelect.getLimit() != null) {
-                root = new Limit(plainSelect.getLimit().getRowCount());
-                node = root;
+                if(root == null) {
+                    root = new Limit(plainSelect.getLimit().getRowCount());
+                    node = root;
+                }
+                else
+                    node = node.cascade(new Limit(plainSelect.getLimit().getRowCount()));
             }
             // Sort operator
             if(plainSelect.getOrderByElements() != null && !plainSelect.getOrderByElements().isEmpty()) {
@@ -59,9 +67,8 @@ public class Parser {
                     root = new Sort(plainSelect.getOrderByElements());
                     node = root;
                 }
-                else {
+                else
                     node = node.cascade(new Sort(plainSelect.getOrderByElements()));
-                }
             }
             // Project or Aggregate operator
             if(root == null) {
@@ -101,34 +108,19 @@ public class Parser {
                 }
                 if(plainSelect.getJoins() != null && !plainSelect.getJoins().isEmpty()) {
                    //Cross Product
-                    CrossProduct crossProduct = new CrossProduct();
-                    node = node.cascade(crossProduct);
-                    int num = plainSelect.getJoins().size();
-                    int i = 0;
-                    if(num == 1) {
-                        ((CrossProduct)node).setLeft(tableScan);
-                        ((CrossProduct)node).setRight(new TableScan((Table) plainSelect.getJoins().get(0).getRightItem()));
-                    }
-                    else {
-                        List<Join> joinList = new ArrayList<>(plainSelect.getJoins());
-                        Collections.reverse(joinList); // reversing join list to create left deep nested cross product
-                        for (Join join : joinList) {
-                            ((CrossProduct) node).setRight(new TableScan((Table) join.getRightItem()));
-                            ((CrossProduct) node).setLeft(new CrossProduct());
-                            node = ((CrossProduct) node).getLeft();
-                            if (num - (++i) <= 1)
-                                break;
-                        }
-                        ((CrossProduct) node).setLeft(tableScan);
-                        ((CrossProduct) node).setRight(new TableScan((Table) joinList.get(num - 1).getRightItem()));
-                    }
+                    node = node.cascade(parseJoins(plainSelect.getJoins(), tableScan));
                     return root;
                 }
 
             }
             else if(plainSelect.getFromItem() instanceof SubSelect){
                 //SubSelect
-                node = node.cascade(parseStatement(((SubSelect) plainSelect.getFromItem()).getSelectBody()));
+                SubSelect subSelect = (SubSelect) plainSelect.getFromItem();
+                if(plainSelect.getJoins() != null && !plainSelect.getJoins().isEmpty()) {
+                    node = node.cascade(parseJoins(plainSelect.getJoins(), parseStatement(subSelect.getSelectBody(), subSelect.getAlias())));
+                }
+                else
+                    node = node.cascade(parseStatement(subSelect.getSelectBody(), subSelect.getAlias()));
             }
             return root;
         }
@@ -140,16 +132,53 @@ public class Parser {
             int i = 0;
             //Union
             for(PlainSelect plainSelect : union.getPlainSelects()) {
-                ((dubstep.operators.Union) node).setLeft(parseStatement(plainSelect));
+                ((dubstep.operators.Union) node).setLeft(parseStatement(plainSelect, null));
                 ((dubstep.operators.Union) node).setRight(new dubstep.operators.Union());
                 node = ((dubstep.operators.Union) node).getRight();
                 if(num - (++i) <= 2)
                     break;
             }
-            ((dubstep.operators.Union) node).setLeft(parseStatement(union.getPlainSelects().get(i)));
-            ((dubstep.operators.Union) node).setRight(parseStatement(union.getPlainSelects().get(i + 1)));
+            ((dubstep.operators.Union) node).setLeft(parseStatement(union.getPlainSelects().get(i), null));
+            ((dubstep.operators.Union) node).setRight(parseStatement(union.getPlainSelects().get(i + 1), null));
             return root;
         }
+    }
+
+    private static Operator parseJoins(List<Join> joins, Operator o) {
+        //Cross Product
+        CrossProduct root = new CrossProduct();
+        Operator node = root;
+        int num = joins.size();
+        int i = 0;
+        if(num == 1) {
+            ((CrossProduct)node).setLeft(o);
+            Join join = joins.get(0);
+            if(join.getRightItem() instanceof Table)
+                ((CrossProduct)node).setRight(new TableScan((Table) join.getRightItem()));
+            else if(join.getRightItem() instanceof SubSelect)
+                ((CrossProduct) node).setRight(parseStatement(((SubSelect) join.getRightItem()).getSelectBody(), join.getRightItem().getAlias()));
+        }
+        else {
+            List<Join> joinList = new ArrayList<>(joins);
+            Collections.reverse(joinList); // reversing join list to create left deep nested cross product
+            for (Join join : joinList) {
+                if(join.getRightItem() instanceof Table)
+                    ((CrossProduct)node).setRight(new TableScan((Table) join.getRightItem()));
+                else if(join.getRightItem() instanceof SubSelect)
+                    ((CrossProduct) node).setRight(parseStatement(((SubSelect) join.getRightItem()).getSelectBody(), join.getRightItem().getAlias()));
+                ((CrossProduct) node).setLeft(new CrossProduct());
+                node = ((CrossProduct) node).getLeft();
+                if (num - (++i) <= 1)
+                    break;
+            }
+            ((CrossProduct) node).setLeft(o);
+            Join join = joinList.get(num - 1);
+            if(join.getRightItem() instanceof Table)
+                ((CrossProduct)node).setRight(new TableScan((Table) join.getRightItem()));
+            else if(join.getRightItem() instanceof SubSelect)
+                ((CrossProduct) node).setRight(parseStatement(((SubSelect) join.getRightItem()).getSelectBody(), join.getRightItem().getAlias()));
+        }
+        return root;
     }
 
     private static Stream<List<Cell>> evaluateTree(Operator node) {
@@ -161,9 +190,10 @@ public class Parser {
             return ((Sort) node).evaluate(evaluateTree(((Sort) node).getChild()));
         else if(node instanceof Limit)
             return ((Limit) node).evaluate(evaluateTree(((Limit) node).getChild()));
-        else if(node instanceof Aggregation) {
+        else if(node instanceof Aggregation)
             return ((Aggregation) node).evaluate(evaluateTree(((Aggregation) node).getChild()));
-        }
+        else if(node instanceof Alias)
+            return ((Alias) node).evaluate(evaluateTree(((Alias) node).getChild()));
         else if(node instanceof CrossProduct) {
             return ((CrossProduct) node)
                     .evaluate(evaluateTree(((CrossProduct) node).getLeft())
@@ -186,6 +216,54 @@ public class Parser {
             {
                 return item instanceof SelectExpressionItem && ((SelectExpressionItem) item).getExpression() instanceof Function;
             });
+    }
+
+    public static String typeOf(PrimitiveValue value) {
+        switch(value.getType()) {
+            case LONG:
+                return "int";
+            case DOUBLE:
+                return "decimal";
+            case STRING:
+                return "string";
+            case BOOL:
+                return "bool";
+            case DATE:
+                return "date";
+            default:
+                return "string";
+        }
+    }
+
+    public static List<Cell> parseTuple(String tupleString, Map<String, String> tupleSchema) {
+        List<String> typeList = new ArrayList<>(tupleSchema.values());
+        List<String> colList = new ArrayList<>(tupleSchema.keySet());
+        int i = 0;
+        List<Cell> tuple = new ArrayList<>();
+        for(String cell : tupleString.split("\\|")) {
+            switch (typeList.get(i)) {
+                case "string":
+                case "varchar":
+                case "char":
+                    tuple.add(new Cell(colList.get(i), new StringValue(cell)));
+                    break;
+                case "int":
+                    tuple.add(new Cell(colList.get(i), new LongValue(cell)));
+                    break;
+                case "decimal":
+                    tuple.add(new Cell(colList.get(i), new DoubleValue(cell)));
+                    break;
+                case "date":
+                    tuple.add(new Cell(colList.get(i), new DateValue(cell)));
+                    break;
+                default:
+                    System.out.println("Could not parse cell " + cell);
+                    tuple.add(new Cell(colList.get(i), new StringValue(cell)));
+                    break;
+            }
+            i++;
+        }
+        return tuple;
     }
 
 }

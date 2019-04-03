@@ -69,7 +69,7 @@ public class TableScan extends Operator {
     }
 
     public Stream<List<Cell>> tableScan() {
-        Path path = Paths.get("data/data/" + tableName + ".dat").toAbsolutePath();
+        Path path = Paths.get("data/" + tableName + ".dat").toAbsolutePath();
         if(!tableAlias.equals(tableName) && !aliasMap.containsKey(tableAlias)) {    //Store table aliases
             aliasMap.put(tableAlias, tableName);
         }
@@ -77,7 +77,7 @@ public class TableScan extends Operator {
             return Files.lines(path).map(s -> parseTuple(s, tableAlias));
         } catch (IOException e) {
             System.out.println("csv file error " + e.getMessage());
-            return null;
+            return Stream.empty();
         }
     }
 
@@ -116,4 +116,5 @@ public class TableScan extends Operator {
         }
         return tuple;
     }
+
 }
