@@ -4,6 +4,7 @@ import dubstep.Cell;
 import dubstep.TupleEval;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 public abstract class Operator {
     public Operator() {
@@ -30,6 +31,10 @@ public abstract class Operator {
         }
         else if(this instanceof Sort) {
             ((Sort) this).setChild(o);
+            return o;
+        }
+        else if(this instanceof Alias) {
+            ((Alias) this).setChild(o);
             return o;
         }
         else if(this instanceof Limit) {

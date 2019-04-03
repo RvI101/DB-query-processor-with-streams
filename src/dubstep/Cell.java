@@ -3,17 +3,42 @@ package dubstep;
 import net.sf.jsqlparser.expression.PrimitiveValue;
 
 public class Cell {
-    String table;
-    String alias;
-    PrimitiveValue value;
+    private String table;
+    private String name;
+    private PrimitiveValue value;
+    private String alias;
 
-    public Cell(String alias, PrimitiveValue value) {
-        this.alias = alias;
+    public Cell(String name, PrimitiveValue value) {
         this.value = value;
-        this.table = alias.split("\\.")[0] != null ? alias.split("\\.")[0] : "";
+        this.table = name.contains(".") ? name.split("\\.")[0] : null;
+        this.name = name.contains(".") ? name.split("\\.")[1]: name;
+    }
+
+    public Cell(String name, PrimitiveValue value, String alias) {
+        this.table = name.contains(".") ? name.split("\\.")[0] : null;
+        this.name = name.contains(".") ? name.split("\\.")[1]: name;
+        this.value = value;
+        this.alias = alias;
     }
 
     public Cell() {
+    }
+
+    public String getWholeName() {
+       if(alias != null)
+           return alias;
+       else if(table != null)
+           return table + "." + name;
+       else
+           return name;
+    }
+
+    public String getAlias() {
+        return alias;
+    }
+
+    public void setAlias(String alias) {
+        this.alias = alias;
     }
 
     public String getTable() {
@@ -24,12 +49,12 @@ public class Cell {
         this.table = table;
     }
 
-    public String getAlias() {
-        return alias;
+    public String getName() {
+        return name;
     }
 
-    public void setAlias(String alias) {
-        this.alias = alias;
+    public void setName(String name) {
+        this.name = name;
     }
 
     public PrimitiveValue getValue() {

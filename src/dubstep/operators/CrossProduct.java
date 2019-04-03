@@ -42,7 +42,7 @@ public class CrossProduct extends Operator {
     public Stream<List<Cell>> evaluate(Stream<List<Cell>> first, Stream<List<Cell>> second) {
         List<List<Cell>> secondTable = second.collect(Collectors.toList()); // storing second table's tuples in memory for cross product
         return Objects.requireNonNull(first)
-                .flatMap(tuple -> secondTable.stream()
+                .flatMap(tuple -> secondTable.stream() //TODO Clean
                         .map(t -> concatenate(tuple, t)));
     }
 
